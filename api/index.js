@@ -4,25 +4,7 @@ import mongoose from "mongoose";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 
-// Import routes with error handling
-let toursRouter,
-  usersRouter,
-  authRouter,
-  reviewsRouter,
-  bookingRouter,
-  paymentRoutes;
-
-try {
-  toursRouter = (await import("./routes/tours.js")).default;
-  usersRouter = (await import("./routes/users.js")).default;
-  authRouter = (await import("./routes/auth.js")).default;
-  reviewsRouter = (await import("./routes/reviews.js")).default;
-  bookingRouter = (await import("./routes/bookings.js")).default;
-  paymentRoutes = (await import("./routes/payment.js")).default;
-} catch (error) {
-  console.error("Route import error:", error);
-}
-
+// Load environment variables first
 dotenv.config();
 
 const app = express();
@@ -77,13 +59,60 @@ app.use(async (req, res, next) => {
   }
 });
 
-// Register Routes (with fallback)
-if (authRouter) app.use("/api/v1/auth", authRouter);
-if (usersRouter) app.use("/api/v1/users", usersRouter);
-if (toursRouter) app.use("/api/v1/tours", toursRouter);
-if (reviewsRouter) app.use("/api/v1/reviews", reviewsRouter);
-if (bookingRouter) app.use("/api/v1/bookings", bookingRouter);
-if (paymentRoutes) app.use("/api/v1/payment", paymentRoutes);
+// Import and register routes with individual error handling
+const registerRoutes = async () => {
+  try {
+    const { default: authRouter } = await import("./api/routes/auth.js");
+    app.use("/api/v1/auth", authRouter);
+    console.log("Auth routes registered");
+  } catch (error) {
+    console.error("Failed to load auth routes:", error.message);
+  }
+
+  try {
+    const { default: usersRouter } = await import("./api/routes/users.js");
+    app.use("/api/v1/users", usersRouter);
+    console.log("Users routes registered");
+  } catch (error) {
+    console.error("Failed to load users routes:", error.message);
+  }
+
+  try {
+    const { default: toursRouter } = await import("./api/routes/tours.js");
+    app.use("/api/v1/tours", toursRouter);
+    console.log("Tours routes registered");
+  } catch (error) {
+    console.error("Failed to load tours routes:", error.message);
+    console.error("Stack:", error.stack);
+  }
+
+  try {
+    const { default: reviewsRouter } = await import("./api/routes/reviews.js");
+    app.use("/api/v1/reviews", reviewsRouter);
+    console.log("Reviews routes registered");
+  } catch (error) {
+    console.error("Failed to load reviews routes:", error.message);
+  }
+
+  try {
+    const { default: bookingRouter } = await import("./api/routes/bookings.js");
+    app.use("/api/v1/bookings", bookingRouter);
+    console.log("Bookings routes registered");
+  } catch (error) {
+    console.error("Failed to load bookings routes:", error.message);
+  }
+
+  try {
+    const { default: paymentRoutes } = await import("./api/routes/payment.js");
+    app.use("/api/v1/payment", paymentRoutes);
+    console.log("Payment routes registered");
+  } catch (error) {
+    console.error("Failed to load payment routes:", error.message);
+  }
+};
+
+// Register routes
+registerRoutes();
 
 // Health check endpoint
 app.get("/api/v1/health", (req, res) => {
