@@ -38,7 +38,7 @@ mongoose.connection.on("disconnected", () =>
 );
 
 // Middleware
-app.use(express.json({ limit: "10mb" })); // Increased limit for gear data
+app.use(express.json({ limit: "10mb" }));
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173",
@@ -47,7 +47,10 @@ app.use(
 );
 app.use(cookieParser());
 
-//  Register Routes
+// Initialize database connection
+connectDB();
+
+// Register Routes
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", usersRouter);
 app.use("/api/v1/tours", toursRouter);
@@ -62,6 +65,23 @@ app.get("/api/v1/health", (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || "development",
     version: "1.0.0",
+  });
+});
+
+// Root endpoint
+app.get("/", (req, res) => {
+  res.json({
+    message: "Travel Backend API",
+    status: "Running",
+    endpoints: {
+      health: "/api/v1/health",
+      auth: "/api/v1/auth",
+      users: "/api/v1/users",
+      tours: "/api/v1/tours",
+      reviews: "/api/v1/reviews",
+      bookings: "/api/v1/bookings",
+      payment: "/api/v1/payment",
+    },
   });
 });
 
@@ -83,10 +103,13 @@ app.use("*", (req, res) => {
   });
 });
 
-// Start Server Only After DB Connects
-connectDB().then(() => {
+// For local development only
+if (process.env.NODE_ENV !== "production") {
   app.listen(port, () => {
     console.log(`Server listening on port ${port}`);
     console.log(`API available at http://localhost:${port}/api/v1`);
   });
-});
+}
+
+// Vercel expects a default export that's a function
+export default app;
