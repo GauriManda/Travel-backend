@@ -29,7 +29,7 @@ router.get("/:id", getSingleTour);
 // Get all tours
 router.get("/", getAllTour);
 
-//get tour by search
+// Get tour by search
 router.get("/search/getTourBySearch", getTourBySearch);
 router.get("/search/getFeaturedTours", getFeaturedTour);
 router.get("/search/getTourContent", getTourContent);
