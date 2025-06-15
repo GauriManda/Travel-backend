@@ -10,5 +10,5 @@ const router = express.Router();
 // Apply verifyToken middleware to protected routes
 router.post("/tour/:tourId", verifyToken, createReview);
 router.get("/tour/:tourId", getTourReviews);
-
+// okay
 export default router;
