@@ -3,39 +3,38 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import toursRouter from "./routes/tours.js";
-import usersRouter from "./routes/users.js";
-import authRouter from "./routes/auth.js";
-import reviewsRouter from "./routes/reviews.js";
-import bookingRouter from "./routes/bookings.js";
-import paymentRoutes from "./routes/payment.js";
+
+// Import routes (adjust paths as needed)
+import toursRouter from "../routes/tours.js";
+import usersRouter from "../routes/users.js";
+import authRouter from "../routes/auth.js";
+import reviewsRouter from "../routes/reviews.js";
+import bookingRouter from "../routes/bookings.js";
+import paymentRoutes from "../routes/payment.js";
 
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 4000;
 
 // Database Connection
 mongoose.set("strictQuery", false);
 
+let isConnected = false;
+
 const connectDB = async () => {
+  if (isConnected) {
+    return;
+  }
+
   try {
     await mongoose.connect(process.env.MONGO_URI);
+    isConnected = true;
     console.log("MongoDB Connected");
   } catch (error) {
     console.error("MongoDB Connection Failed:", error.message);
-    process.exit(1);
+    throw error;
   }
 };
-
-app.use("/uploads", express.static("uploads"));
-
-// Event Listeners for DB
-mongoose.connection.on("connected", () => console.log("MongoDB Connected"));
-mongoose.connection.on("error", (err) => console.error("DB Error:", err));
-mongoose.connection.on("disconnected", () =>
-  console.log("⚠️ MongoDB Disconnected")
-);
 
 // Middleware
 app.use(express.json({ limit: "10mb" }));
@@ -46,9 +45,6 @@ app.use(
   })
 );
 app.use(cookieParser());
-
-// Initialize database connection
-connectDB();
 
 // Register Routes
 app.use("/api/v1/auth", authRouter);
@@ -103,13 +99,8 @@ app.use("*", (req, res) => {
   });
 });
 
-// For local development only
-if (process.env.NODE_ENV !== "production") {
-  app.listen(port, () => {
-    console.log(`Server listening on port ${port}`);
-    console.log(`API available at http://localhost:${port}/api/v1`);
-  });
-}
-
-// Vercel expects a default export that's a function
-export default app;
+// Vercel serverless function handler
+export default async (req, res) => {
+  await connectDB();
+  return app(req, res);
+};
