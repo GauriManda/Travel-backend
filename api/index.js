@@ -40,7 +40,12 @@ const connectDB = async () => {
 app.use(express.json({ limit: "10mb" }));
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: [
+      process.env.CLIENT_URL || "http://localhost:5173",
+      "http://localhost:4000",
+      "http://localhost:5174",
+      "https://your-frontend-domain.vercel.app", // Add your actual frontend domain
+    ],
     credentials: true,
   })
 );
