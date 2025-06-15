@@ -50,14 +50,22 @@ const connectDB = async () => {
 // Middleware to ensure DB connection
 const ensureDBConnection = async (req, res, next) => {
   try {
+    console.log("🔌 Checking database connection...");
     await connectDB();
+    console.log("✅ Database connection confirmed");
     next();
   } catch (error) {
-    console.error("DB connection middleware error:", error);
+    console.error("❌ DB connection middleware error:", error);
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
     res.status(500).json({
       success: false,
       message: "Database connection failed",
       error: error.message,
+      timestamp: new Date().toISOString(),
     });
   }
 };
@@ -126,6 +134,13 @@ app.use("/uploads", express.static("uploads"));
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 
+// Add request logging middleware
+app.use((req, res, next) => {
+  console.log(`📥 ${req.method} ${req.url}`);
+  console.log(`📍 Headers:`, JSON.stringify(req.headers, null, 2));
+  next();
+});
+
 // Apply DB connection middleware to all API routes
 app.use("/api", ensureDBConnection);
 
@@ -172,16 +187,22 @@ app.get("/", (req, res) => {
   });
 });
 
-// Error middleware
+// Error middleware with detailed logging
 app.use((err, req, res, next) => {
-  console.error("Global error handler:", err.stack);
+  console.error("🚨 Global error handler triggered:");
+  console.error("Error message:", err.message);
+  console.error("Error stack:", err.stack);
+  console.error("Request URL:", req.url);
+  console.error("Request method:", req.method);
+  console.error("Request headers:", req.headers);
+
   res.status(500).json({
     success: false,
     message: "Something went wrong!",
-    error:
-      process.env.NODE_ENV === "development"
-        ? err.message
-        : "Internal server error",
+    error: err.message || "Internal server error",
+    url: req.url,
+    method: req.method,
+    timestamp: new Date().toISOString(),
   });
 });
 
