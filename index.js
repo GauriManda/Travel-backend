@@ -14,7 +14,7 @@ dotenv.config();
 
 const app = express();
 
-console.log("🚀 Server starting with MongoDB and CORS fix v4.0");
+console.log("🚀 Server starting with MongoDB and CORS fix v4.1");
 
 // MongoDB connection with optimization for serverless
 let isConnected = false;
@@ -62,14 +62,37 @@ const ensureDBConnection = async (req, res, next) => {
   }
 };
 
-// CORS - Place this FIRST
+// CORS - Updated to handle multiple origins
 app.use((req, res, next) => {
   console.log(`🌐 Request from: ${req.headers.origin} to ${req.url}`);
 
-  res.setHeader(
-    "Access-Control-Allow-Origin",
-    "https://travel-frontend-ckdh.vercel.app"
-  );
+  const allowedOrigins = [
+    "https://travel-frontend-tau-tawny.vercel.app", // Current frontend URL
+    "https://travel-frontend-ckdh.vercel.app", // Previous frontend URL
+    "http://localhost:5173", // Local development (Vite)
+    "http://localhost:4000", // Local development (React)
+    "http://localhost:8000", // Local backend testing
+  ];
+
+  const origin = req.headers.origin;
+  console.log(`🔍 Checking origin: ${origin}`);
+
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    console.log(`✅ Origin ${origin} allowed`);
+  } else {
+    console.log(`❌ Origin ${origin} not in allowed list`);
+    // For debugging: allow all Vercel preview deployments of your app
+    if (
+      origin &&
+      origin.includes("travel-frontend") &&
+      origin.includes("vercel.app")
+    ) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      console.log(`✅ Vercel preview deployment ${origin} allowed`);
+    }
+  }
+
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader(
     "Access-Control-Allow-Methods",
@@ -111,7 +134,7 @@ app.get("/api/v1/health", async (req, res) => {
       status: "OK",
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || "development",
-      version: "4.0.0",
+      version: "4.1.0",
       database:
         mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
     });
@@ -120,7 +143,7 @@ app.get("/api/v1/health", async (req, res) => {
       status: "ERROR",
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || "development",
-      version: "4.0.0",
+      version: "4.1.0",
       database: "Connection failed",
       error: error.message,
     });
@@ -132,8 +155,8 @@ app.get("/", (req, res) => {
   res.json({
     message: "Travel Backend API",
     status: "Running",
-    version: "4.0.0",
-    cors: "Fixed",
+    version: "4.1.0",
+    cors: "Multi-origin support enabled",
     mongodb: "Optimized for serverless",
   });
 });
