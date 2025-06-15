@@ -1,12 +1,20 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import User from "../models/User.js"; // Adjust path as needed
+import User from "../models/User.js";
 
-// Generate JWT token
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET || "your-secret-key", {
-    expiresIn: "7d",
-  });
+// FIXED: Generate JWT token with correct payload structure and secret key
+const generateToken = (user) => {
+  return jwt.sign(
+    {
+      id: user._id, // Changed from userId to id to match middleware
+      role: user.role, // Include role for authorization
+      username: user.username, // Include username if needed
+    },
+    process.env.JWT_SECRET_KEY || "your-secret-key", // Use JWT_SECRET_KEY to match middleware
+    {
+      expiresIn: "7d",
+    }
+  );
 };
 
 // @desc    Register new user
@@ -86,8 +94,8 @@ export const register = async (req, res) => {
       role: "user", // default role
     });
 
-    // Generate token
-    const token = generateToken(user._id);
+    // FIXED: Pass user object to generateToken
+    const token = generateToken(user);
 
     // Remove password from response
     const userResponse = {
@@ -98,8 +106,6 @@ export const register = async (req, res) => {
       createdAt: user.createdAt,
     };
 
-    // Note: AuthContext expects REGISTER_SUCCESS to NOT automatically log the user in
-    // The user needs to manually log in after registration
     res.status(201).json({
       success: true,
       message: "User registered successfully",
@@ -151,7 +157,7 @@ export const login = async (req, res) => {
         { email: identifier.toLowerCase() },
         { username: identifier.toLowerCase() },
       ],
-    }).select("+password"); // Include password field for comparison
+    }).select("+password");
 
     if (!user) {
       return res.status(404).json({
@@ -170,8 +176,8 @@ export const login = async (req, res) => {
       });
     }
 
-    // Generate token
-    const token = generateToken(user._id);
+    // FIXED: Pass user object to generateToken
+    const token = generateToken(user);
 
     // Set HTTP-only cookie (optional, for additional security)
     res.cookie("token", token, {
@@ -216,7 +222,8 @@ export const login = async (req, res) => {
 // @access  Private
 export const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select("-password");
+    // FIXED: Use req.user.id instead of req.user.userId to match token payload
+    const user = await User.findById(req.user.id).select("-password");
 
     if (!user) {
       return res.status(404).json({

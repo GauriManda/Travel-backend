@@ -14,25 +14,21 @@ import { verifyToken, verifyAdmin } from "../utils/verifyToken.js";
 
 const router = express.Router();
 
-// Create a new tour
-router.post("/", verifyAdmin, createTour);
-
-// Update a tour
-router.put("/:id", verifyAdmin, updateTour);
-
-// Delete a tour
-router.delete("/:id", verifyAdmin, deleteTour);
-
-// Get a single tour
-router.get("/:id", getSingleTour);
-
-// Get all tours
-router.get("/", getAllTour);
-
-// Get tour by search
+// Public search routes (no authentication required)
 router.get("/search/getTourBySearch", getTourBySearch);
-router.get("/search/getFeaturedTours", getFeaturedTour);
+router.get("/search/getFeaturedTours", getFeaturedTour); // REMOVED verifyToken - now public
 router.get("/search/getTourContent", getTourContent);
 router.get("/search/getTourCount", getTourCount);
+
+// Get all tours (this should come before /:id) - consider if this should be public or protected
+router.get("/", getAllTour);
+
+// Public route for single tour details
+router.get("/:id", getSingleTour);
+
+// Admin routes (protected)
+router.post("/", verifyAdmin, createTour);
+router.put("/:id", verifyAdmin, updateTour);
+router.delete("/:id", verifyAdmin, deleteTour);
 
 export default router;
