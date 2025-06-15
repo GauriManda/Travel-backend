@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import mongoose from "mongoose";
 import toursRouter from "./routes/tours.js";
 import usersRouter from "./routes/users.js";
 import authRouter from "./routes/auth.js";
@@ -12,6 +13,20 @@ import paymentRoutes from "./routes/payment.js";
 dotenv.config();
 
 const app = express();
+
+// Database connection
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("MongoDB connected successfully");
+  } catch (error) {
+    console.error("MongoDB connection error:", error);
+    process.exit(1);
+  }
+};
+
+// Connect to database
+connectDB();
 
 app.use("/uploads", express.static("uploads"));
 
@@ -42,6 +57,15 @@ app.get("/api/v1/health", (req, res) => {
   });
 });
 
+// Root route
+app.get("/", (req, res) => {
+  res.json({
+    message: "Travel Backend API",
+    status: "Running",
+    version: "1.0.0",
+  });
+});
+
 // Error middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -60,4 +84,13 @@ app.use("*", (req, res) => {
   });
 });
 
+// For local development
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 8000;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+// Export for Vercel
 export default app;
