@@ -2,7 +2,7 @@ import express from "express";
 import {
   createReview,
   getTourReviews,
-} from "../../controllers/reviewController.js";
+} from "../controllers/reviewController.js";
 import { verifyToken } from "../utils/verifyToken.js";
 
 const router = express.Router();
