@@ -3,150 +3,95 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-
-// Comment out route imports temporarily to debug
-// import toursRouter from "./routes/tours.js";
-// import usersRouter from "./routes/users.js";
-// import authRouter from "./routes/auth.js";
-// import reviewsRouter from "./routes/reviews.js";
-// import bookingRouter from "./routes/bookings.js";
-// import paymentRoutes from "./routes/payment.js";
+import toursRouter from "./routes/tours.js";
+import usersRouter from "./routes/users.js";
+import authRouter from "./routes/auth.js";
+import reviewsRouter from "./routes/reviews.js";
+import bookingRouter from "./routes/bookings.js";
+import paymentRoutes from "./routes/payment.js";
 
 dotenv.config();
 
 const app = express();
+const port = process.env.PORT || 4000;
 
-// Database Connection with better error handling
-let cachedConnection = null;
+// Database Connection
+mongoose.set("strictQuery", false);
 
 const connectDB = async () => {
-  if (cachedConnection) {
-    console.log("Using cached MongoDB connection");
-    return cachedConnection;
-  }
-
   try {
-    if (!process.env.MONGO_URI) {
-      throw new Error("MONGO_URI environment variable is not defined");
-    }
-
-    const connection = await mongoose.connect(process.env.MONGO_URI, {
-      bufferCommands: false,
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-    });
-
-    cachedConnection = connection;
-    console.log("MongoDB Connected Successfully");
-    return connection;
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("MongoDB Connected");
   } catch (error) {
     console.error("MongoDB Connection Failed:", error.message);
-    cachedConnection = null;
-    throw error;
+    process.exit(1);
   }
 };
 
-// Middleware
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+app.use("/uploads", express.static("uploads"));
 
-app.use(
-  cors({
-    origin: [
-      process.env.CLIENT_URL || "http://localhost:5173",
-      "http://localhost:4000",
-      "http://localhost:5174",
-      "https://travel-backend-9hrb4ffzg-gauri-mandas-projects.vercel.app",
-    ],
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
-  })
+// Event Listeners for DB
+mongoose.connection.on("connected", () => console.log("MongoDB Connected"));
+mongoose.connection.on("error", (err) => console.error("DB Error:", err));
+mongoose.connection.on("disconnected", () =>
+  console.log("⚠️ MongoDB Disconnected")
 );
 
+// Middleware
+app.use(express.json({ limit: "10mb" }));
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
+  })
+);
 app.use(cookieParser());
 
-// Add request logging for debugging
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
-  next();
-});
+// Initialize database connection
+connectDB();
 
-// Temporary simple routes for testing (replace the commented imports)
-app.get("/api/v1/auth/test", (req, res) => {
-  res.json({
-    message: "Auth route working",
-    timestamp: new Date().toISOString(),
-  });
-});
-
-app.get("/api/v1/tours/test", (req, res) => {
-  res.json({
-    message: "Tours route working",
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// Register Routes (commented out for debugging)
-// app.use("/api/v1/auth", authRouter);
-// app.use("/api/v1/users", usersRouter);
-// app.use("/api/v1/tours", toursRouter);
-// app.use("/api/v1/reviews", reviewsRouter);
-// app.use("/api/v1/bookings", bookingRouter);
-// app.use("/api/v1/payment", paymentRoutes);
+// Register Routes
+app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/users", usersRouter);
+app.use("/api/v1/tours", toursRouter);
+app.use("/api/v1/reviews", reviewsRouter);
+app.use("/api/v1/bookings", bookingRouter);
+app.use("/api/v1/payment", paymentRoutes);
 
 // Health check endpoint
-app.get("/api/v1/health", async (req, res) => {
-  let dbStatus = "Disconnected";
-
-  try {
-    if (cachedConnection && mongoose.connection.readyState === 1) {
-      dbStatus = "Connected";
-    }
-  } catch (error) {
-    console.error("Health check DB error:", error);
-  }
-
+app.get("/api/v1/health", (req, res) => {
   res.json({
     status: "OK",
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || "development",
     version: "1.0.0",
-    mongodb: dbStatus,
-    nodeVersion: process.version,
   });
 });
 
 // Root endpoint
 app.get("/", (req, res) => {
   res.json({
-    message: "Travel Backend API - Debug Version",
+    message: "Travel Backend API",
     status: "Running",
-    timestamp: new Date().toISOString(),
     endpoints: {
       health: "/api/v1/health",
-      authTest: "/api/v1/auth/test",
-      toursTest: "/api/v1/tours/test",
-    },
-    environment: {
-      nodeEnv: process.env.NODE_ENV,
-      hasMongoUri: !!process.env.MONGO_URI,
-      clientUrl: process.env.CLIENT_URL,
+      auth: "/api/v1/auth",
+      users: "/api/v1/users",
+      tours: "/api/v1/tours",
+      reviews: "/api/v1/reviews",
+      bookings: "/api/v1/bookings",
+      payment: "/api/v1/payment",
     },
   });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error("Express Error:", err.stack);
-  res.status(err.status || 500).json({
+  console.error(err.stack);
+  res.status(500).json({
     success: false,
-    message: err.message || "Something went wrong!",
-    error:
-      process.env.NODE_ENV === "development"
-        ? err.stack
-        : "Internal Server Error",
-    timestamp: new Date().toISOString(),
+    message: "Something went wrong!",
+    error: process.env.NODE_ENV === "development" ? err.message : {},
   });
 });
 
@@ -154,32 +99,17 @@ app.use((err, req, res, next) => {
 app.use("*", (req, res) => {
   res.status(404).json({
     success: false,
-    message: `Route ${req.method} ${req.originalUrl} not found`,
-    timestamp: new Date().toISOString(),
+    message: "Route not found",
   });
 });
 
-// Vercel serverless function handler with better error handling
-export default async (req, res) => {
-  try {
-    console.log("Handler invoked:", req.method, req.url);
+// For local development only
+if (process.env.NODE_ENV !== "production") {
+  app.listen(port, () => {
+    console.log(`Server listening on port ${port}`);
+    console.log(`API available at http://localhost:${port}/api/v1`);
+  });
+}
 
-    // Connect to database
-    await connectDB();
-
-    // Handle the request
-    return app(req, res);
-  } catch (error) {
-    console.error("Handler error:", error);
-
-    // Make sure we return a proper response
-    if (!res.headersSent) {
-      return res.status(500).json({
-        success: false,
-        message: "Server initialization failed",
-        error: error.message,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }
-};
+// Vercel expects a default export that's a function
+export default app;
