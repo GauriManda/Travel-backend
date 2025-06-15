@@ -62,35 +62,46 @@ const ensureDBConnection = async (req, res, next) => {
   }
 };
 
-// CORS - Updated to handle multiple origins
+// CORS - Dynamic origin handling for Vercel deployments
 app.use((req, res, next) => {
   console.log(`🌐 Request from: ${req.headers.origin} to ${req.url}`);
-
-  const allowedOrigins = [
-    "https://travel-frontend-tau-tawny.vercel.app", // Current frontend URL
-    "https://travel-frontend-ckdh.vercel.app", // Previous frontend URL
-    "http://localhost:5173", // Local development (Vite)
-    "http://localhost:4000", // Local development (React)
-    "http://localhost:8000", // Local backend testing
-  ];
 
   const origin = req.headers.origin;
   console.log(`🔍 Checking origin: ${origin}`);
 
-  if (allowedOrigins.includes(origin)) {
+  // Define allowed origins
+  const localOrigins = [
+    "http://localhost:5173", // Local development (Vite)
+    "http://localhost:3000", // Local development (React)
+    "http://localhost:8000", // Local backend testing
+  ];
+
+  let isAllowed = false;
+
+  // Check local development origins
+  if (localOrigins.includes(origin)) {
+    isAllowed = true;
+    console.log(`✅ Local origin ${origin} allowed`);
+  }
+  // Check if it's a Vercel deployment of your travel-frontend
+  else if (
+    origin &&
+    origin.includes("travel-frontend") &&
+    origin.includes("vercel.app")
+  ) {
+    isAllowed = true;
+    console.log(`✅ Vercel deployment ${origin} allowed`);
+  }
+  // Production domain (if you have a custom domain)
+  else if (origin === process.env.FRONTEND_URL) {
+    isAllowed = true;
+    console.log(`✅ Production domain ${origin} allowed`);
+  }
+
+  if (isAllowed) {
     res.setHeader("Access-Control-Allow-Origin", origin);
-    console.log(`✅ Origin ${origin} allowed`);
   } else {
-    console.log(`❌ Origin ${origin} not in allowed list`);
-    // For debugging: allow all Vercel preview deployments of your app
-    if (
-      origin &&
-      origin.includes("travel-frontend") &&
-      origin.includes("vercel.app")
-    ) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      console.log(`✅ Vercel preview deployment ${origin} allowed`);
-    }
+    console.log(`❌ Origin ${origin} not allowed`);
   }
 
   res.setHeader("Access-Control-Allow-Credentials", "true");
@@ -156,7 +167,7 @@ app.get("/", (req, res) => {
     message: "Travel Backend API",
     status: "Running",
     version: "4.1.0",
-    cors: "Multi-origin support enabled",
+    cors: "Dynamic Vercel deployments supported",
     mongodb: "Optimized for serverless",
   });
 });
