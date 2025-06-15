@@ -1,4 +1,4 @@
-import app from "./app.js";
+import app from "./index.js";
 import connectDB from "./db.js"; // We'll extract DB logic there
 import serverless from "serverless-http";
 
