@@ -5,7 +5,7 @@ import {
   deleteUser,
   getSingleUser,
   getAllUsers, // Fixed: was getAllUser, now getAllUsers (plural)
-} from "../controllers/userController.js";
+} from "../../controllers/userController.js";
 import { verifyAdmin, verifyUser } from "../utils/verifyToken.js";
 
 const router = express.Router();
