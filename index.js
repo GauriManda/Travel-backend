@@ -71,7 +71,7 @@ app.use((req, res, next) => {
   const allowedOrigins = [
     // Local development
     "http://localhost:5173",
-    "http://localhost:3000",
+    "http://localhost:4000",
     "http://localhost:8000",
     // Production domains
     process.env.FRONTEND_URL,
@@ -209,7 +209,7 @@ app.use("*", (req, res) => {
 
 // For local development
 if (process.env.NODE_ENV !== "production") {
-  const PORT = process.env.PORT || 8000;
+  const PORT = process.env.PORT || 4000;
   app.listen(PORT, async () => {
     await connectDB();
     console.log(`Server running on port ${PORT}`);
