@@ -207,13 +207,42 @@ app.use("*", (req, res) => {
   });
 });
 
-// For local development
-if (process.env.NODE_ENV !== "production") {
-  const PORT = process.env.PORT || 4000;
-  app.listen(PORT, async () => {
-    await connectDB();
-    console.log(`Server running on port ${PORT}`);
+// Force server to start - remove problematic conditional logic
+const PORT = process.env.PORT || 4000;
+
+console.log(`🔍 Debug info:`);
+console.log(`NODE_ENV: "${process.env.NODE_ENV}"`);
+console.log(`PORT: ${PORT}`);
+console.log(`Attempting to start server...`);
+
+try {
+  const server = app.listen(PORT, "0.0.0.0", async () => {
+    try {
+      await connectDB();
+      console.log(`✅ Server successfully running on port ${PORT}`);
+      console.log(`🌐 Local: http://localhost:${PORT}`);
+      console.log(`🌐 Network: http://0.0.0.0:${PORT}`);
+    } catch (dbError) {
+      console.error("❌ Database connection failed:", dbError);
+    }
   });
+
+  server.on("error", (error) => {
+    console.error("❌ Server error:", error);
+    if (error.code === "EADDRINUSE") {
+      console.log(`Port ${PORT} is already in use. Trying port ${PORT + 1}...`);
+      // You could implement port incrementing logic here
+    }
+  });
+
+  server.on("listening", () => {
+    const addr = server.address();
+    console.log(
+      `🎯 Server is actually listening on ${addr.address}:${addr.port}`
+    );
+  });
+} catch (error) {
+  console.error("❌ Failed to create server:", error);
 }
 
 // Export for Vercel
