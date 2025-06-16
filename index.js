@@ -14,7 +14,7 @@ dotenv.config();
 
 const app = express();
 
-console.log("🚀 Server starting with MongoDB and CORS fix v4.1");
+console.log("🚀 Server starting with MongoDB and CORS fix v4.2");
 
 // MongoDB connection with optimization for serverless
 let isConnected = false;
@@ -70,38 +70,54 @@ app.use((req, res, next) => {
   console.log(`🔍 Checking origin: ${origin}`);
 
   // Define allowed origins
-  const localOrigins = [
-    "http://localhost:5173", // Local development (Vite)
-    "http://localhost:3000", // Local development (React)
-    "http://localhost:8000", // Local backend testing
+  const allowedOrigins = [
+    // Local development
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    // Production domains
+    process.env.FRONTEND_URL,
+    process.env.CLIENT_URL,
+  ];
+
+  // Regex patterns for dynamic Vercel deployments
+  const allowedPatterns = [
+    /^https:\/\/travel-frontend.*\.vercel\.app$/, // Any travel-frontend deployment
+    /^http:\/\/localhost:\d+$/, // Any localhost port
   ];
 
   let isAllowed = false;
 
-  // Check local development origins
-  if (localOrigins.includes(origin)) {
+  // Check exact matches
+  if (allowedOrigins.includes(origin)) {
     isAllowed = true;
-    console.log(`✅ Local origin ${origin} allowed`);
+    console.log(`✅ Exact match: ${origin} allowed`);
   }
-  // Check if it's a Vercel deployment of your travel-frontend
-  else if (
-    origin &&
-    origin.includes("travel-frontend") &&
-    origin.includes("vercel.app")
-  ) {
-    isAllowed = true;
-    console.log(`✅ Vercel deployment ${origin} allowed`);
-  }
-  // Production domain (if you have a custom domain)
-  else if (origin === process.env.FRONTEND_URL) {
-    isAllowed = true;
-    console.log(`✅ Production domain ${origin} allowed`);
+
+  // Check pattern matches
+  if (!isAllowed && origin) {
+    for (const pattern of allowedPatterns) {
+      if (pattern.test(origin)) {
+        isAllowed = true;
+        console.log(`✅ Pattern match: ${origin} allowed by ${pattern}`);
+        break;
+      }
+    }
   }
 
   if (isAllowed) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   } else {
     console.log(`❌ Origin ${origin} not allowed`);
+    // Debug logging
+    console.log(`Debug info:`, {
+      origin,
+      exactMatches: allowedOrigins.filter((o) => o === origin),
+      patternTests: allowedPatterns.map((p) => ({
+        pattern: p.toString(),
+        matches: p.test(origin || ""),
+      })),
+    });
   }
 
   res.setHeader("Access-Control-Allow-Credentials", "true");
@@ -145,7 +161,7 @@ app.get("/api/v1/health", async (req, res) => {
       status: "OK",
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || "development",
-      version: "4.1.0",
+      version: "4.2.0",
       database:
         mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
     });
@@ -154,7 +170,7 @@ app.get("/api/v1/health", async (req, res) => {
       status: "ERROR",
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || "development",
-      version: "4.1.0",
+      version: "4.2.0",
       database: "Connection failed",
       error: error.message,
     });
@@ -166,8 +182,8 @@ app.get("/", (req, res) => {
   res.json({
     message: "Travel Backend API",
     status: "Running",
-    version: "4.1.0",
-    cors: "Dynamic Vercel deployments supported",
+    version: "4.2.0",
+    cors: "Regex pattern matching for dynamic Vercel deployments",
     mongodb: "Optimized for serverless",
   });
 });
