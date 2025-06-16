@@ -14,7 +14,7 @@ dotenv.config();
 
 const app = express();
 
-console.log("🚀 Server starting with MongoDB and CORS fix v4.2");
+console.log("🚀 Server starting with MongoDB and CORS fix v4.3");
 
 // MongoDB connection with optimization for serverless
 let isConnected = false;
@@ -35,8 +35,6 @@ const connectDB = async () => {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
-      bufferMaxEntries: 0,
-      bufferCommands: false,
     });
 
     isConnected = conn.connections[0].readyState === 1;
@@ -161,7 +159,7 @@ app.get("/api/v1/health", async (req, res) => {
       status: "OK",
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || "development",
-      version: "4.2.0",
+      version: "4.3.0",
       database:
         mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
     });
@@ -170,7 +168,7 @@ app.get("/api/v1/health", async (req, res) => {
       status: "ERROR",
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || "development",
-      version: "4.2.0",
+      version: "4.3.0",
       database: "Connection failed",
       error: error.message,
     });
@@ -182,8 +180,8 @@ app.get("/", (req, res) => {
   res.json({
     message: "Travel Backend API",
     status: "Running",
-    version: "4.2.0",
-    cors: "Regex pattern matching for dynamic Vercel deployments",
+    version: "4.3.0",
+    cors: "Fixed MongoDB connection options",
     mongodb: "Optimized for serverless",
   });
 });
