@@ -72,7 +72,9 @@ app.use((req, res, next) => {
     "http://localhost:8000",
     process.env.FRONTEND_URL,
     process.env.CLIENT_URL,
+    "https://travel-frontend-q5ce.vercel.app", // ✅ explicitly allowed
   ];
+
   const allowedPatterns = [
     /^https:\/\/travel-frontend.*\.vercel\.app$/,
     /^http:\/\/localhost:\d+$/,
