@@ -145,10 +145,8 @@ export const createExperience = async (req, res) => {
 
     // Handle uploaded images
     if (req.files && req.files.length > 0) {
-      experienceData.images = req.files.map(
-        (file) => `/uploads/experiences/${file.filename}`
-      );
-      console.log(`📷 Added ${req.files.length} images`);
+      experienceData.images = req.files.map((file) => file.path); // Cloudinary URL
+      console.log(`📷 Uploaded ${req.files.length} images to Cloudinary`);
     }
 
     // Parse JSON fields if they're strings

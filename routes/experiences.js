@@ -1,7 +1,6 @@
 import express from "express";
 import multer from "multer";
 import path from "path";
-import fs from "fs";
 import {
   getAllExperiences,
   getExperienceById,
@@ -17,34 +16,31 @@ import {
   getExperienceStats,
 } from "../controllers/experienceController.js";
 
-const router = express.Router();
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 
-// Ensure uploads directory exists
-const uploadsDir = "uploads/experiences/";
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log(`📁 Created uploads directory: ${uploadsDir}`);
-}
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-// Configure multer for image uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const fileExtension = path.extname(file.originalname).toLowerCase();
-    const fileName = `${file.fieldname}-${uniqueSuffix}${fileExtension}`;
-    console.log(`📷 Uploading file: ${fileName}`);
-    cb(null, fileName);
+// Set up Multer storage with Cloudinary
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "experiences",
+    allowed_formats: ["jpg", "jpeg", "png", "webp", "gif"],
+    transformation: [{ width: 800, height: 600, crop: "limit" }],
   },
 });
 
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit per file
-    files: 10, // Maximum 10 files
+    fileSize: 5 * 1024 * 1024, // 5MB per file
+    files: 10,
   },
   fileFilter: function (req, file, cb) {
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
@@ -60,6 +56,19 @@ const upload = multer({
     }
   },
 });
+
+const router = express.Router();
+
+// Middleware for logging requests
+const logRequest = (req, res, next) => {
+  console.log(
+    `🌐 ${req.method} ${req.originalUrl} - ${new Date().toISOString()}`
+  );
+  if (Object.keys(req.query).length > 0) {
+    console.log(`🔍 Query:`, req.query);
+  }
+  next();
+};
 
 // Multer error handling middleware
 const handleMulterError = (error, req, res, next) => {
@@ -90,25 +99,11 @@ const handleMulterError = (error, req, res, next) => {
   next(error);
 };
 
-// Request logging middleware
-const logRequest = (req, res, next) => {
-  console.log(
-    `🌐 ${req.method} ${req.originalUrl} - ${new Date().toISOString()}`
-  );
-  if (Object.keys(req.query).length > 0) {
-    console.log(`🔍 Query:`, req.query);
-  }
-  next();
-};
-
-// Apply logging to all routes
 router.use(logRequest);
 
-// =====================================================
-// ROUTE DEFINITIONS (Order matters!)
-// =====================================================
+// ================== ROUTES ==================
 
-// SPECIFIC ROUTES FIRST (must come before parameterized routes)
+// Specific routes first
 router.get("/stats", getExperienceStats);
 router.get("/search/suggestions", getSearchSuggestions);
 router.get("/featured/popular", getPopularExperiences);
@@ -116,7 +111,7 @@ router.get("/featured/recent", getRecentExperiences);
 router.get("/category/:category", getExperiencesByCategory);
 router.get("/destination/:destination", getExperiencesByDestination);
 
-// GENERAL ROUTES
+// General routes
 router.get("/", getAllExperiences);
 router.post(
   "/",
@@ -125,7 +120,7 @@ router.post(
   createExperience
 );
 
-// PARAMETERIZED ROUTES LAST
+// Parameterized routes
 router.get("/:id", getExperienceById);
 router.put(
   "/:id",
@@ -136,7 +131,7 @@ router.put(
 router.delete("/:id", deleteExperience);
 router.post("/:id/like", toggleLikeExperience);
 
-// Error handling
+// Fallback for undefined routes
 router.use((req, res) => {
   console.log(`❌ 404 - Route not found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({
@@ -145,6 +140,7 @@ router.use((req, res) => {
   });
 });
 
+// General error handler
 router.use((error, req, res, next) => {
   console.error("❌ Experience routes error:", error);
   res.status(500).json({
