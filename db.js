@@ -1,27 +1,31 @@
 import mongoose from "mongoose";
 
-let isConnected = false;
+// Global cache to store the connection across Lambda invocations
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
 
 const connectDB = async () => {
-  if (isConnected) {
-    return;
+  if (cached.conn) {
+    return cached.conn;
   }
 
-  try {
-    const conn = await mongoose.connect(process.env.MONGO_URI, {
+  if (!cached.promise) {
+    mongoose.set("strictQuery", true);
+
+    cached.promise = mongoose.connect(process.env.MONGO_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
     });
-
-    isConnected = conn.connections[0].readyState === 1;
-
-    if (isConnected) {
-      console.log("✅ MongoDB connected successfully (serverless)");
-    }
-  } catch (error) {
-    console.error("❌ MongoDB connection failed:", error.message);
-    throw error;
   }
+
+  cached.conn = await cached.promise;
+  return cached.conn;
 };
 
 export default connectDB;
