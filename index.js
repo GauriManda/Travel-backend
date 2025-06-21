@@ -9,6 +9,7 @@ import authRouter from "./routes/auth.js";
 import reviewsRouter from "./routes/reviews.js";
 import bookingRouter from "./routes/bookings.js";
 import paymentRoutes from "./routes/payment.js";
+import experiencesRouter from "./routes/experiences.js";
 
 dotenv.config();
 
@@ -60,62 +61,36 @@ const ensureDBConnection = async (req, res, next) => {
   }
 };
 
-// CORS - Dynamic origin handling for Vercel deployments
+// CORS - Dynamic origin handling with fallback for undefined origins
 app.use((req, res, next) => {
-  console.log(`🌐 Request from: ${req.headers.origin} to ${req.url}`);
-
   const origin = req.headers.origin;
-  console.log(`🔍 Checking origin: ${origin}`);
-
-  // Define allowed origins
   const allowedOrigins = [
-    // Local development
     "http://localhost:5173",
     "http://localhost:4000",
     "http://localhost:8000",
-    // Production domains
     process.env.FRONTEND_URL,
     process.env.CLIENT_URL,
   ];
-
-  // Regex patterns for dynamic Vercel deployments
   const allowedPatterns = [
-    /^https:\/\/travel-frontend.*\.vercel\.app$/, // Any travel-frontend deployment
-    /^http:\/\/localhost:\d+$/, // Any localhost port
+    /^https:\/\/travel-frontend.*\.vercel\.app$/,
+    /^http:\/\/localhost:\d+$/,
   ];
 
   let isAllowed = false;
 
-  // Check exact matches
-  if (allowedOrigins.includes(origin)) {
+  if (origin && allowedOrigins.includes(origin)) {
     isAllowed = true;
-    console.log(`✅ Exact match: ${origin} allowed`);
   }
 
-  // Check pattern matches
   if (!isAllowed && origin) {
-    for (const pattern of allowedPatterns) {
-      if (pattern.test(origin)) {
-        isAllowed = true;
-        console.log(`✅ Pattern match: ${origin} allowed by ${pattern}`);
-        break;
-      }
-    }
+    isAllowed = allowedPatterns.some((pattern) => pattern.test(origin));
   }
 
-  if (isAllowed) {
+  if (isAllowed && origin) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   } else {
-    console.log(`❌ Origin ${origin} not allowed`);
-    // Debug logging
-    console.log(`Debug info:`, {
-      origin,
-      exactMatches: allowedOrigins.filter((o) => o === origin),
-      patternTests: allowedPatterns.map((p) => ({
-        pattern: p.toString(),
-        matches: p.test(origin || ""),
-      })),
-    });
+    // Fallback for undefined origins (e.g., SSR tools or no origin header)
+    res.setHeader("Access-Control-Allow-Origin", "*");
   }
 
   res.setHeader("Access-Control-Allow-Credentials", "true");
@@ -129,7 +104,6 @@ app.use((req, res, next) => {
   );
 
   if (req.method === "OPTIONS") {
-    console.log("✈️ Handling OPTIONS preflight request");
     return res.status(200).end();
   }
 
@@ -150,6 +124,7 @@ app.use("/api/v1/tours", toursRouter);
 app.use("/api/v1/reviews", reviewsRouter);
 app.use("/api/v1/bookings", bookingRouter);
 app.use("/api/v1/payment", paymentRoutes);
+app.use("/api/v1/experiences", experiencesRouter);
 
 // Health check (with DB status)
 app.get("/api/v1/health", async (req, res) => {
