@@ -1,9 +1,10 @@
 import mongoose from "mongoose";
 import Experience from "../models/Experience.js";
-
+import connectDB from "../config/connectDB.js";
 // Get all experiences with filtering and sorting
 export const getAllExperiences = async (req, res) => {
   try {
+    await connectDB();
     console.log("📋 GET /experiences - Query params:", req.query);
 
     const {
