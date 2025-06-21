@@ -72,6 +72,7 @@ app.use((req, res, next) => {
     "http://localhost:8000",
     process.env.FRONTEND_URL,
     process.env.CLIENT_URL,
+    "https://travel-frontend-ckdh.vercel.app", // ✅ Updated to match your actual frontend URL
     "https://travel-frontend-q5ce.vercel.app", // ✅ explicitly allowed
   ];
 
