@@ -15,19 +15,20 @@ dotenv.config();
 
 const app = express();
 
-console.log("🚀 Server starting with MongoDB and CORS fix v4.3");
+console.log("🚀 Server initializing with MongoDB and CORS fix (Vercel-ready)");
 
-// MongoDB connection with optimization for serverless
+// =========================================
+// MongoDB Connection (serverless-friendly)
+// =========================================
 let isConnected = false;
 
 const connectDB = async () => {
   if (isConnected) {
-    console.log("MongoDB already connected");
+    console.log("✅ MongoDB already connected");
     return;
   }
 
   try {
-    // Set mongoose options for serverless
     mongoose.set("bufferCommands", false);
 
     const conn = await mongoose.connect(process.env.MONGO_URI, {
@@ -39,9 +40,9 @@ const connectDB = async () => {
     });
 
     isConnected = conn.connections[0].readyState === 1;
-    console.log("MongoDB connected successfully");
+    console.log("✅ MongoDB connected successfully");
   } catch (error) {
-    console.error("MongoDB connection error:", error);
+    console.error("❌ MongoDB connection error:", error);
     throw error;
   }
 };
@@ -52,7 +53,6 @@ const ensureDBConnection = async (req, res, next) => {
     await connectDB();
     next();
   } catch (error) {
-    console.error("DB connection middleware error:", error);
     res.status(500).json({
       success: false,
       message: "Database connection failed",
@@ -61,7 +61,9 @@ const ensureDBConnection = async (req, res, next) => {
   }
 };
 
-// CORS - Dynamic origin handling with fallback for undefined origins
+// =========================================
+// CORS Handling
+// =========================================
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   const allowedOrigins = [
@@ -76,20 +78,13 @@ app.use((req, res, next) => {
     /^http:\/\/localhost:\d+$/,
   ];
 
-  let isAllowed = false;
-
-  if (origin && allowedOrigins.includes(origin)) {
-    isAllowed = true;
-  }
-
-  if (!isAllowed && origin) {
-    isAllowed = allowedPatterns.some((pattern) => pattern.test(origin));
-  }
+  let isAllowed =
+    (origin && allowedOrigins.includes(origin)) ||
+    allowedPatterns.some((pattern) => pattern.test(origin));
 
   if (isAllowed && origin) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   } else {
-    // Fallback for undefined origins (e.g., SSR tools or no origin header)
     res.setHeader("Access-Control-Allow-Origin", "*");
   }
 
@@ -110,14 +105,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// =========================================
+// Global Middleware
+// =========================================
 app.use("/uploads", express.static("uploads"));
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
-
-// Apply DB connection middleware to all API routes
 app.use("/api", ensureDBConnection);
 
-// Register Routes (these will now have DB connection ensured)
+// =========================================
+// API Routes
+// =========================================
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", usersRouter);
 app.use("/api/v1/tours", toursRouter);
@@ -126,7 +124,9 @@ app.use("/api/v1/bookings", bookingRouter);
 app.use("/api/v1/payment", paymentRoutes);
 app.use("/api/v1/experiences", experiencesRouter);
 
-// Health check (with DB status)
+// =========================================
+// Health Check
+// =========================================
 app.get("/api/v1/health", async (req, res) => {
   try {
     await connectDB();
@@ -150,18 +150,20 @@ app.get("/api/v1/health", async (req, res) => {
   }
 });
 
-// Root route
+// Root Route
 app.get("/", (req, res) => {
   res.json({
     message: "Travel Backend API",
     status: "Running",
     version: "4.3.0",
-    cors: "Fixed MongoDB connection options",
+    deployment: "Vercel-compatible",
     mongodb: "Optimized for serverless",
   });
 });
 
-// Error middleware
+// =========================================
+// Error Handling
+// =========================================
 app.use((err, req, res, next) => {
   console.error("Global error handler:", err.stack);
   res.status(500).json({
@@ -174,7 +176,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404
+// 404 Route
 app.use("*", (req, res) => {
   res.status(404).json({
     success: false,
@@ -182,43 +184,18 @@ app.use("*", (req, res) => {
   });
 });
 
-// Force server to start - remove problematic conditional logic
-const PORT = process.env.PORT || 4000;
-
-console.log(`🔍 Debug info:`);
-console.log(`NODE_ENV: "${process.env.NODE_ENV}"`);
-console.log(`PORT: ${PORT}`);
-console.log(`Attempting to start server...`);
-
-try {
-  const server = app.listen(PORT, "0.0.0.0", async () => {
-    try {
-      await connectDB();
-      console.log(`✅ Server successfully running on port ${PORT}`);
-      console.log(`🌐 Local: http://localhost:${PORT}`);
-      console.log(`🌐 Network: http://0.0.0.0:${PORT}`);
-    } catch (dbError) {
-      console.error("❌ Database connection failed:", dbError);
-    }
-  });
-
-  server.on("error", (error) => {
-    console.error("❌ Server error:", error);
-    if (error.code === "EADDRINUSE") {
-      console.log(`Port ${PORT} is already in use. Trying port ${PORT + 1}...`);
-      // You could implement port incrementing logic here
-    }
-  });
-
-  server.on("listening", () => {
-    const addr = server.address();
-    console.log(
-      `🎯 Server is actually listening on ${addr.address}:${addr.port}`
-    );
-  });
-} catch (error) {
-  console.error("❌ Failed to create server:", error);
-}
-
-// Export for Vercel
+// =========================================
+// Vercel Export (NO app.listen())
+// =========================================
 export default app;
+
+// =========================================
+// Local Development (Optional)
+// =========================================
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 4000;
+  app.listen(PORT, async () => {
+    await connectDB();
+    console.log(`✅ Local server running at http://localhost:${PORT}`);
+  });
+}
