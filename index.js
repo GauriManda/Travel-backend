@@ -108,8 +108,7 @@ const allowedOrigins = [
   process.env.CLIENT_URL,
   "https://travel-frontend-ckdh.vercel.app",
   "https://travel-frontend-q5ce.vercel.app",
-  // Add your actual frontend URL here
-  "https://your-frontend-app.vercel.app",
+  "https://travel-frontend-tau-tawny.vercel.app",
 ];
 
 const allowedPatterns = [
