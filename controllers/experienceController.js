@@ -1,7 +1,21 @@
 import mongoose from "mongoose";
 import Experience from "../models/Experience.js";
 
-// Get all experiences with filtering and sorting
+// Utility: safely parse JSON fields
+const safeParseJSON = (value, fieldName, res) => {
+  try {
+    return typeof value === "string" ? JSON.parse(value) : value;
+  } catch (e) {
+    console.error(`❌ Invalid JSON for ${fieldName}:`, e.message);
+    res.status(400).json({
+      success: false,
+      message: `Invalid format for ${fieldName}`,
+    });
+    return null;
+  }
+};
+
+// ========================== GET All ==========================
 export const getAllExperiences = async (req, res) => {
   try {
     console.log("📋 GET /experiences - Query params:", req.query);
@@ -16,21 +30,12 @@ export const getAllExperiences = async (req, res) => {
       sortBy = "newest",
     } = req.query;
 
-    // Build filter object
     const filter = { isPublished: true };
 
-    if (category && category !== "all") {
-      filter.categories = { $in: [category] };
-    }
-
-    if (budgetRange && budgetRange !== "all") {
-      filter.budgetRange = budgetRange;
-    }
-
-    if (destination) {
+    if (category && category !== "all") filter.categories = { $in: [category] };
+    if (budgetRange && budgetRange !== "all") filter.budgetRange = budgetRange;
+    if (destination)
       filter.destination = { $regex: destination, $options: "i" };
-    }
-
     if (search) {
       filter.$or = [
         { title: { $regex: search, $options: "i" } },
@@ -39,27 +44,15 @@ export const getAllExperiences = async (req, res) => {
       ];
     }
 
-    // Build sort object
-    let sort = {};
-    switch (sortBy) {
-      case "newest":
-        sort = { createdAt: -1 };
-        break;
-      case "oldest":
-        sort = { createdAt: 1 };
-        break;
-      case "popular":
-        sort = { likes: -1, views: -1 };
-        break;
-      case "rating":
-        sort = { rating: -1 };
-        break;
-      default:
-        sort = { createdAt: -1 };
-    }
+    const sortMap = {
+      newest: { createdAt: -1 },
+      oldest: { createdAt: 1 },
+      popular: { likes: -1, views: -1 },
+      rating: { rating: -1 },
+    };
 
+    const sort = sortMap[sortBy] || { createdAt: -1 };
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    console.log(`📄 Fetching page ${page}, limit ${limit}, skip ${skip}`);
 
     const experiences = await Experience.find(filter)
       .sort(sort)
@@ -68,8 +61,6 @@ export const getAllExperiences = async (req, res) => {
       .select("-likedBy");
 
     const total = await Experience.countDocuments(filter);
-
-    console.log(`✅ Found ${experiences.length} experiences, total: ${total}`);
 
     res.json({
       success: true,
@@ -92,38 +83,28 @@ export const getAllExperiences = async (req, res) => {
   }
 };
 
-// Get single experience by ID
+// ========================== GET by ID ==========================
 export const getExperienceById = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`📋 GET /experiences/${id}`);
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid experience ID",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid experience ID" });
     }
 
     const experience = await Experience.findById(id);
-
     if (!experience) {
-      return res.status(404).json({
-        success: false,
-        message: "Experience not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Experience not found" });
     }
 
-    // Increment view count
     experience.views = (experience.views || 0) + 1;
     await experience.save();
 
-    console.log(`✅ Found experience: ${experience.title}`);
-
-    res.json({
-      success: true,
-      experience,
-    });
+    res.json({ success: true, experience });
   } catch (error) {
     console.error("❌ Error fetching experience:", error);
     res.status(500).json({
@@ -134,177 +115,124 @@ export const getExperienceById = async (req, res) => {
   }
 };
 
-// Create new experience
+// ========================== CREATE ==========================
 export const createExperience = async (req, res) => {
   try {
-    console.log("🚀 POST /experiences - Creating new experience");
-    console.log("📁 Files:", req.files?.length || 0);
-    console.log("📋 Body keys:", Object.keys(req.body));
-
-    const experienceData = { ...req.body };
-
-    // Handle uploaded images
-    if (req.files && req.files.length > 0) {
-      experienceData.images = req.files.map((file) => file.path); // Cloudinary URL
-      console.log(`📷 Uploaded ${req.files.length} images to Cloudinary`);
-    }
-
-    // Parse JSON fields if they're strings
-    if (typeof experienceData.itinerary === "string") {
-      try {
-        experienceData.itinerary = JSON.parse(experienceData.itinerary);
-      } catch (e) {
-        console.error("❌ Error parsing itinerary:", e);
-        return res.status(400).json({
-          success: false,
-          message: "Invalid itinerary format",
-        });
-      }
-    }
-
-    if (typeof experienceData.categories === "string") {
-      try {
-        experienceData.categories = JSON.parse(experienceData.categories);
-      } catch (e) {
-        console.error("❌ Error parsing categories:", e);
-        return res.status(400).json({
-          success: false,
-          message: "Invalid categories format",
-        });
-      }
-    }
-
-    // Set default author if not provided
-    if (!experienceData.author) {
-      experienceData.author = {
-        name: "Anonymous User",
-        avatar: "/api/placeholder/32/32",
-      };
-    }
-
-    // Set defaults
-    experienceData.likes = 0;
-    experienceData.views = 0;
-    experienceData.likedBy = [];
-    experienceData.isPublished = true;
-
-    console.log("📝 Final data:", {
-      title: experienceData.title,
-      destination: experienceData.destination,
-      duration: experienceData.duration,
-      categories: experienceData.categories,
-      images: experienceData.images?.length || 0,
-    });
-
-    const experience = new Experience(experienceData);
-    await experience.save();
-
-    console.log(`✅ Experience created with ID: ${experience._id}`);
-
-    res.status(201).json({
-      success: true,
-      message: "Experience created successfully",
-      experience,
-    });
-  } catch (error) {
-    console.error("❌ Error creating experience:", error);
-
-    if (error.name === "ValidationError") {
-      const errors = Object.values(error.errors).map((err) => err.message);
-      return res.status(400).json({
-        success: false,
-        message: "Validation error",
-        errors,
-      });
-    }
-
-    res.status(400).json({
-      success: false,
-      message: "Error creating experience",
-      error: error.message,
-    });
-  }
-};
-
-// Like/unlike experience
-export const toggleLikeExperience = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.body.userId || "anonymous";
-
-    console.log(`❤️  POST /experiences/${id}/like - User: ${userId}`);
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid experience ID",
-      });
-    }
-
-    const experience = await Experience.findById(id);
-
-    if (!experience) {
-      return res.status(404).json({
-        success: false,
-        message: "Experience not found",
-      });
-    }
-
-    if (!experience.likedBy) {
-      experience.likedBy = [];
-    }
-
-    const isLiked = experience.likedBy.includes(userId);
-
-    if (isLiked) {
-      experience.likedBy.pull(userId);
-      experience.likes = Math.max(0, (experience.likes || 0) - 1);
-    } else {
-      experience.likedBy.push(userId);
-      experience.likes = (experience.likes || 0) + 1;
-    }
-
-    await experience.save();
-
+    console.log("📥 Incoming experience submission...");
+    console.log("📝 Form fields:", req.body);
     console.log(
-      `✅ Experience ${isLiked ? "unliked" : "liked"}, total likes: ${
-        experience.likes
-      }`
+      "🖼 Uploaded files:",
+      req.files?.map((f) => f.originalname) || []
     );
 
-    res.json({
+    const {
+      title,
+      destination,
+      description,
+      duration,
+      groupSize,
+      budgetRange,
+      categories,
+      itinerary,
+      tips,
+      bestTimeToVisit,
+      transportation,
+      totalCost,
+    } = req.body;
+
+    if (!title || !destination || !description || !budgetRange) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Title, destination, description, and budget range are required.",
+      });
+    }
+
+    const allowedBudget = ["budget", "mid-range", "luxury"];
+    if (!allowedBudget.includes(budgetRange)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid budget range provided.",
+      });
+    }
+
+    // ✅ Safely parse JSON fields
+    let parsedCategories = safeParseJSON(categories, "categories", res);
+    if (!parsedCategories) return;
+
+    let parsedItinerary = safeParseJSON(itinerary, "itinerary", res);
+    if (!parsedItinerary) return;
+
+    const validItinerary = parsedItinerary.filter(
+      (day) => day.activities && day.activities.trim()
+    );
+
+    if (validItinerary.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one itinerary day with activities is required.",
+      });
+    }
+
+    // ✅ Process image paths
+    const uploadedImages = Array.isArray(req.files)
+      ? req.files.map((file) => file.path)
+      : [];
+
+    if (uploadedImages.length === 0) {
+      console.warn("⚠️ No images received in req.files");
+    }
+
+    const newExperience = new Experience({
+      title: title.trim(),
+      destination: destination.trim(),
+      description: description.trim(),
+      duration: parseInt(duration) || 1,
+      groupSize: parseInt(groupSize) || 1,
+      budgetRange,
+      categories: parsedCategories,
+      itinerary: validItinerary,
+      tips: tips?.trim(),
+      bestTimeToVisit: bestTimeToVisit?.trim(),
+      transportation: transportation?.trim(),
+      totalCost: parseFloat(totalCost) || undefined,
+
+      images:
+        req.files?.map((file) => {
+          return `${req.protocol}://${req.get("host")}/uploads/${
+            file.filename
+          }`;
+        }) || [],
+    });
+
+    const saved = await newExperience.save();
+
+    console.log("✅ Experience created:", saved._id);
+    res.status(201).json({
       success: true,
-      message: isLiked ? "Experience unliked" : "Experience liked",
-      likes: experience.likes,
-      isLiked: !isLiked,
+      experience: saved,
     });
   } catch (error) {
-    console.error("❌ Error toggling like:", error);
+    console.error("❌ Error in createExperience:", error.message);
     res.status(500).json({
       success: false,
-      message: "Error toggling like",
+      message: "Something went wrong while creating experience.",
       error: error.message,
+      stack: error.stack,
     });
   }
 };
 
-// Get popular experiences
+// ========================== POPULAR ==========================
 export const getPopularExperiences = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 6;
-    console.log(`🌟 GET /experiences/featured/popular - limit: ${limit}`);
-
     const experiences = await Experience.find({ isPublished: true })
       .sort({ likes: -1, views: -1 })
       .limit(limit)
       .select("-likedBy");
 
-    console.log(`✅ Found ${experiences.length} popular experiences`);
-
-    res.json({
-      success: true,
-      experiences,
-    });
+    res.json({ success: true, experiences });
   } catch (error) {
     console.error("❌ Error fetching popular experiences:", error);
     res.status(500).json({
@@ -315,23 +243,16 @@ export const getPopularExperiences = async (req, res) => {
   }
 };
 
-// Get recent experiences
+// ========================== RECENT ==========================
 export const getRecentExperiences = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 6;
-    console.log(`🕒 GET /experiences/featured/recent - limit: ${limit}`);
-
     const experiences = await Experience.find({ isPublished: true })
       .sort({ createdAt: -1 })
       .limit(limit)
       .select("-likedBy");
 
-    console.log(`✅ Found ${experiences.length} recent experiences`);
-
-    res.json({
-      success: true,
-      experiences,
-    });
+    res.json({ success: true, experiences });
   } catch (error) {
     console.error("❌ Error fetching recent experiences:", error);
     res.status(500).json({
@@ -342,18 +263,18 @@ export const getRecentExperiences = async (req, res) => {
   }
 };
 
-// Placeholder functions for routes that need implementation
+// ========================== PLACEHOLDERS ==========================
 export const updateExperience = async (req, res) => {
-  res.json({
+  res.status(501).json({
     success: false,
-    message: "Update experience endpoint - implement as needed",
+    message: "Update experience endpoint - not implemented yet",
   });
 };
 
 export const deleteExperience = async (req, res) => {
-  res.json({
+  res.status(501).json({
     success: false,
-    message: "Delete experience endpoint - implement as needed",
+    message: "Delete experience endpoint - not implemented yet",
   });
 };
 

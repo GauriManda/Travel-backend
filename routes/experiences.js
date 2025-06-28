@@ -7,7 +7,6 @@ import {
   createExperience,
   updateExperience,
   deleteExperience,
-  toggleLikeExperience,
   getPopularExperiences,
   getRecentExperiences,
   getSearchSuggestions,
@@ -26,7 +25,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Set up Multer storage with Cloudinary
+// Set up Cloudinary storage
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -36,10 +35,11 @@ const storage = new CloudinaryStorage({
   },
 });
 
+// ✅ Define Multer middleware (THIS WAS MISSING BEFORE)
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB per file
+    fileSize: 5 * 1024 * 1024, // 5MB
     files: 10,
   },
   fileFilter: function (req, file, cb) {
@@ -57,6 +57,7 @@ const upload = multer({
   },
 });
 
+// Express router
 const router = express.Router();
 
 // Middleware for logging requests
@@ -90,7 +91,10 @@ const handleMulterError = (error, req, res, next) => {
       message: `Upload error: ${error.message}`,
     });
   }
-  if (error.message.includes("Only image files")) {
+  if (
+    typeof error.message === "string" &&
+    error.message.includes("Only image files")
+  ) {
     return res.status(400).json({
       success: false,
       message: error.message,
@@ -103,7 +107,7 @@ router.use(logRequest);
 
 // ================== ROUTES ==================
 
-// Specific routes first
+// Specific routes
 router.get("/stats", getExperienceStats);
 router.get("/search/suggestions", getSearchSuggestions);
 router.get("/featured/popular", getPopularExperiences);
@@ -116,20 +120,13 @@ router.get("/", getAllExperiences);
 router.post(
   "/",
   upload.array("images", 10),
-  handleMulterError,
-  createExperience
+  createExperience // ✅ Keep it clean
 );
 
 // Parameterized routes
 router.get("/:id", getExperienceById);
-router.put(
-  "/:id",
-  upload.array("images", 10),
-  handleMulterError,
-  updateExperience
-);
+router.put("/:id", upload.array("images", 10), updateExperience);
 router.delete("/:id", deleteExperience);
-router.post("/:id/like", toggleLikeExperience);
 
 // Fallback for undefined routes
 router.use((req, res) => {
@@ -139,7 +136,7 @@ router.use((req, res) => {
     message: `Route ${req.method} ${req.originalUrl} not found`,
   });
 });
-
+router.use(handleMulterError);
 // General error handler
 router.use((error, req, res, next) => {
   console.error("❌ Experience routes error:", error);

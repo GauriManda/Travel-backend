@@ -18,20 +18,17 @@ const experienceSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: true,
-      trim: true,
-      maxlength: 100,
+      required: [true, "Title is required"],
     },
     destination: {
       type: String,
-      required: true,
-      trim: true,
+      required: [true, "Destination is required"],
     },
     description: {
       type: String,
-      required: true,
-      maxlength: 2000,
+      required: [true, "Description is required"],
     },
+
     duration: {
       type: Number,
       required: true,
@@ -83,37 +80,7 @@ const experienceSchema = new mongoose.Schema(
         type: String, // URLs to images
       },
     ],
-    author: {
-      name: {
-        type: String,
-        required: true,
-      },
-      avatar: String,
-      userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    },
-    rating: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 5,
-    },
-    likes: {
-      type: Number,
-      default: 0,
-    },
-    likedBy: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-    views: {
-      type: Number,
-      default: 0,
-    },
+
     isPublished: {
       type: Boolean,
       default: true,
@@ -135,6 +102,20 @@ const experienceSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Pre-save middleware to ensure author has default values
+experienceSchema.pre("save", function (next) {
+  if (!this.author) {
+    this.author = {};
+  }
+  if (!this.author.name) {
+    this.author.name = "Anonymous User";
+  }
+  if (!this.author.avatar) {
+    this.author.avatar = "/api/placeholder/32/32";
+  }
+  next();
+});
 
 // Indexes
 experienceSchema.index({ location: "2dsphere" });
