@@ -20,6 +20,7 @@ console.log(
   "🚀 Server initializing with optimized MongoDB connection for Vercel"
 );
 
+// MongoDB connection caching for Vercel
 let cached = global.mongoose;
 if (!cached) {
   cached = global.mongoose = { conn: null, promise: null };
@@ -79,6 +80,7 @@ const connectDB = async () => {
   }
 };
 
+// Database connection middleware with timeout
 const ensureDBConnection = async (req, res, next) => {
   try {
     const connectionTimeout = new Promise((_, reject) => {
@@ -96,34 +98,47 @@ const ensureDBConnection = async (req, res, next) => {
   }
 };
 
+// Enhanced CORS configuration
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:4000",
   "http://localhost:8000",
+  "http://localhost:3000",
   process.env.FRONTEND_URL,
   process.env.CLIENT_URL,
   "https://travel-frontend-ckdh.vercel.app",
   "https://travel-frontend-q5ce.vercel.app",
+  // Add your actual frontend URL here
+  "https://your-frontend-app.vercel.app",
 ];
 
 const allowedPatterns = [
   /^https:\/\/travel-frontend.*\.vercel\.app$/,
   /^http:\/\/localhost:\d+$/,
+  /^https:\/\/.*\.vercel\.app$/, // Be more specific in production
 ];
 
+// Custom CORS middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   let isAllowed = false;
+
   if (origin) {
     isAllowed =
       allowedOrigins.includes(origin) ||
       allowedPatterns.some((pattern) => pattern.test(origin));
   }
+
   if (isAllowed && origin) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   } else {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    // For development, allow all origins. In production, be more restrictive
+    res.setHeader(
+      "Access-Control-Allow-Origin",
+      process.env.NODE_ENV === "production" ? "null" : "*"
+    );
   }
+
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader(
     "Access-Control-Allow-Methods",
@@ -133,17 +148,23 @@ app.use((req, res, next) => {
     "Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept, Authorization"
   );
+
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
+
   next();
 });
 
+// Middleware setup
 app.use("/uploads", express.static("uploads"));
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
+
+// Apply DB connection middleware to all API routes
 app.use("/api", ensureDBConnection);
 
+// Route setup
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", usersRouter);
 app.use("/api/v1/tours", toursRouter);
@@ -152,11 +173,13 @@ app.use("/api/v1/bookings", bookingRouter);
 app.use("/api/v1/payment", paymentRoutes);
 app.use("/api/v1/experiences", experiencesRouter);
 
+// Enhanced health check endpoint
 app.get("/api/v1/health", async (req, res) => {
   try {
     const start = Date.now();
     await connectDB();
     const connectionTime = Date.now() - start;
+
     res.json({
       status: "OK",
       timestamp: new Date().toISOString(),
@@ -166,6 +189,11 @@ app.get("/api/v1/health", async (req, res) => {
         mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
       connectionTime: `${connectionTime}ms`,
       uptime: process.uptime(),
+      deployment: "Vercel",
+      cors: {
+        allowedOrigins: allowedOrigins.length,
+        patterns: allowedPatterns.length,
+      },
     });
   } catch (error) {
     console.error("❌ Health check failed:", error);
@@ -180,6 +208,7 @@ app.get("/api/v1/health", async (req, res) => {
   }
 });
 
+// Root endpoint
 app.get("/", (req, res) => {
   res.json({
     message: "Travel Backend API",
@@ -187,11 +216,14 @@ app.get("/", (req, res) => {
     version: "4.4.0",
     deployment: "Vercel-optimized",
     mongodb: "Serverless connection pooling enabled",
+    timestamp: new Date().toISOString(),
   });
 });
 
+// Global error handlers
 app.use((err, req, res, next) => {
   console.error("❌ Global error handler:", err);
+
   if (err.name === "MongoNetworkError") {
     return res.status(503).json({
       success: false,
@@ -199,6 +231,7 @@ app.use((err, req, res, next) => {
       error: "Connection timeout",
     });
   }
+
   if (err.name === "MongoTimeoutError") {
     return res.status(503).json({
       success: false,
@@ -206,6 +239,7 @@ app.use((err, req, res, next) => {
       error: "Query timeout",
     });
   }
+
   res.status(500).json({
     success: false,
     message: "Something went wrong!",
@@ -216,6 +250,7 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Final error handler
 app.use((err, req, res, next) => {
   console.error("❌ Final global error handler triggered:", err);
   if (res.headersSent) {
@@ -231,13 +266,16 @@ app.use((err, req, res, next) => {
   });
 });
 
+// 404 handler
 app.use("*", (req, res) => {
   res.status(404).json({
     success: false,
     message: "Route not found",
+    requestedPath: req.originalUrl,
   });
 });
 
+// Graceful shutdown
 process.on("SIGINT", async () => {
   console.log("🛑 Received SIGINT, shutting down gracefully...");
   try {
@@ -251,8 +289,10 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
+// For Vercel, export the app as default
 export default app;
 
+// For local development
 if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 4000;
   app.listen(PORT, async () => {
